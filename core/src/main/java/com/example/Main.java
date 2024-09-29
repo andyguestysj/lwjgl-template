@@ -47,7 +47,7 @@ public class Main {
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
 
 		// Create the window
-		window = glfwCreateWindow(300, 300, "Hello World!", NULL, NULL);
+		window = glfwCreateWindow(1000, 800, "Hello World!", NULL, NULL);
 		if ( window == NULL )
 			throw new RuntimeException("Failed to create the GLFW window");
 
@@ -85,12 +85,76 @@ public class Main {
 		glfwShowWindow(window);
 	}
 
+	public int DrawStuff() {
+
+		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
+
+		glLoadIdentity();
+			
+		
+		glBegin(GL_TRIANGLES);                      // Drawing Using Triangles
+			glColor3f(1f,1f,1f);
+			glVertex3f( 0.0f, 0.25f, 0.0f);              // Top
+			glVertex3f(-0.25f,-0.25f, 0.0f);              // Bottom Left
+			glVertex3f( 0.25f,-0.25f, 0.0f);              // Bottom Right
+		glEnd();
+
+		glLoadIdentity();
+
+		glTranslatef(-0.5f,0.0f,0.0f); 
+		glScalef(0.2f, 0.2f, 0.2f);
+		glRotatef(180f,0f, 0f,1f);
+		
+		glBegin(GL_TRIANGLES);                      // Drawing Using Triangles
+			glColor3f(1f,0f,0f);
+			glVertex3f( 0.0f, 0.25f, 0.0f);              // Top
+			glVertex3f(-0.25f,-0.25f, 0.0f);              // Bottom Left
+			glVertex3f( 0.25f,-0.25f, 0.0f);              // Bottom Right
+		glEnd();
+
+		glLoadIdentity();
+
+		glRotatef(180f,0f, 0f,1f);
+		glTranslatef(-0.5f,0.0f,0.0f); 
+		glScalef(0.2f, 0.2f, 0.2f);
+		
+		
+		glBegin(GL_TRIANGLES);                      // Drawing Using Triangles
+			glColor3f(0f,1f,0f);
+			glVertex3f( 0.0f, 0.25f, 0.0f);              // Top
+			glVertex3f(-0.25f,-0.25f, 0.0f);              // Bottom Left
+			glVertex3f( 0.25f,-0.25f, 0.0f);              // Bottom Right
+		glEnd();
+
+		glLoadIdentity();
+
+		glRotatef(90f,0f, 0f,1f);
+		glTranslatef(-0.5f,0.0f,0.0f); 
+		glScalef(0.2f, 0.2f, 0.2f);
+		
+		
+		glBegin(GL_TRIANGLES);                      // Drawing Using Triangles
+			glColor3f(0f,1f,0f);
+			glVertex3f( 0.0f, 0.25f, 0.0f);              // Top
+			glColor3f(1f,0f,0f);
+			glVertex3f(-0.25f,-0.25f, 0.0f);              // Bottom Left
+			glColor3f(0f,0f,1f);
+			glVertex3f( 0.25f,-0.25f, 0.0f);              // Bottom Right
+		glEnd();
+
+		// replace GL_TRIANGLES with GL_QUADS for a polygon with more vertices
+
+		return 1;
+	}
+
 	private void loop() {
 		// This line is critical for LWJGL's interoperation with GLFW's
 		// OpenGL context, or any context that is managed externally.
 		// LWJGL detects the context that is current in the current thread,
 		// creates the GLCapabilities instance and makes the OpenGL
 		// bindings available for use.
+
 		GL.createCapabilities();
 
 		// Set the clear color
@@ -100,6 +164,8 @@ public class Main {
 		// the window or has pressed the ESCAPE key.
 		while ( !glfwWindowShouldClose(window) ) {
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
+
+			// DrawStuff();
 
 			glfwSwapBuffers(window); // swap the color buffers
 
