@@ -1,36 +1,275 @@
 package com.example;
+import org.joml.Matrix4f;
 import org.lwjgl.*;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
 import org.lwjgl.system.*;
 
-import java.nio.*;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.lwjgl.glfw.Callbacks.*;
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
+
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
+import static org.lwjgl.opengl.GL11.GL_COLOR_ARRAY;
+import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
+import static org.lwjgl.opengl.GL11.GL_FLOAT;
+import static org.lwjgl.opengl.GL11.GL_MODELVIEW;
+import static org.lwjgl.opengl.GL11.GL_PROJECTION;
+import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
+import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
+import static org.lwjgl.opengl.GL11.GL_VERTEX_ARRAY;
+import static org.lwjgl.opengl.GL11.glClear;
+import static org.lwjgl.opengl.GL11.glClearColor;
+import static org.lwjgl.opengl.GL11.glColorPointer;
+import static org.lwjgl.opengl.GL11.glDrawElements;
+import static org.lwjgl.opengl.GL11.glEnable;
+import static org.lwjgl.opengl.GL11.glEnableClientState;
+import static org.lwjgl.opengl.GL11.glLoadIdentity;
+import static org.lwjgl.opengl.GL11.glMatrixMode;
+import static org.lwjgl.opengl.GL11.glOrtho;
+import static org.lwjgl.opengl.GL11.glRotated;
+import static org.lwjgl.opengl.GL11.glTranslated;
+import static org.lwjgl.opengl.GL11.glVertexPointer;
+import static org.lwjgl.opengl.GL11.glViewport;
+import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15.GL_STATIC_DRAW;
+import static org.lwjgl.opengl.GL15.glBindBuffer;
+import static org.lwjgl.opengl.GL15.glBufferData;
+import static org.lwjgl.opengl.GL15.glGenBuffers;
+import static org.lwjgl.opengl.GL20.GL_FRAGMENT_SHADER;
+import static org.lwjgl.opengl.GL20.GL_INFO_LOG_LENGTH;
+import static org.lwjgl.opengl.GL20.GL_LINK_STATUS;
+import static org.lwjgl.opengl.GL20.GL_VERTEX_SHADER;
+import static org.lwjgl.opengl.GL20.glAttachShader;
+import static org.lwjgl.opengl.GL20.glCompileShader;
+import static org.lwjgl.opengl.GL20.glCreateProgram;
+import static org.lwjgl.opengl.GL20.glCreateShader;
+import static org.lwjgl.opengl.GL20.glDeleteShader;
+import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
+import static org.lwjgl.opengl.GL20.glGetProgramInfoLog;
+import static org.lwjgl.opengl.GL20.glGetProgrami;
+import static org.lwjgl.opengl.GL20.glGetShaderInfoLog;
+import static org.lwjgl.opengl.GL20.glGetShaderi;
+import static org.lwjgl.opengl.GL20.glGetUniformLocation;
+import static org.lwjgl.opengl.GL20.glLinkProgram;
+import static org.lwjgl.opengl.GL20.glShaderSource;
+import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
+import static org.lwjgl.opengl.GL20.glUseProgram;
+import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
+import static org.lwjgl.opengl.GL30.*;
+
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+
 
 public class Main {
 
+	public boolean VAO;
 	// The window handle
 	private long window;
 
+	public int count;
+	
+	public int numVertices;
+	public int vaoId;	
+  public List<Integer> vboIdList;
+
+	public int programID;
+	public int vertexShaderID;
+	public int fragmentShaderID;	
+	public Map<String, Integer> uniforms;
+
+	
+
+	public FloatBuffer cubeCoordBuffer ;
+	public FloatBuffer cubeFaceColorBuffer ;
+
+	public float rotateX;
+	public float rotateY;
+	public float rotateZ;
+	
+
 	public void run() {
+		count=0;
+		VAO = true;
 		System.out.println("Hello LWJGL " + Version.getVersion() + "!");
 
 		init();
+				
+		makeShader();
+		
+		if (VAO)
+			makeShapes();
+		else
+			makeShapes2();
+
 		loop();
-
-		// Free the window callbacks and destroy the window
-		glfwFreeCallbacks(window);
-		glfwDestroyWindow(window);
-
-		// Terminate GLFW and free the error callback
-		glfwTerminate();
-		glfwSetErrorCallback(null).free();
+		cleanup();
 	}
+
+
+	private void makeShader(){ 
+	
+		String vshaderSource[ ] =
+		{ 
+			"#version 330 \n",
+			"layout (location=0) in vec3 position; \n",
+			"layout (location=1) in vec3 color; \n",
+			"out vec3 outColor; \n",
+			"void main() \n",
+			"{ gl_Position = vec4(position, 1.0); \n",
+			" outColor = color;}"
+			
+		};
+
+		String fshaderSource[ ] =
+		{ "#version 330 \n",
+			"in vec3 outColor; \n",
+			"out vec4 fragColor; \n",
+			"void main(void) \n",
+			"{ fragColor = vec4(outColor, 1.0); }"
+		};
+
+    
+		int count=0;
+		
+		programID = glCreateProgram();
+
+		vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShaderID, vshaderSource);
+    glCompileShader(vertexShaderID);
+		if (vertexShaderID == 0) {
+			throw new RuntimeException("Error creating shader. Type: " + GL_VERTEX_SHADER);
+		}
+		System.out.println(glGetShaderInfoLog(vertexShaderID, glGetShaderi(vertexShaderID, GL_INFO_LOG_LENGTH)));
+    glAttachShader(programID, vertexShaderID);
+
+		fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShaderID, fshaderSource);
+    glCompileShader(fragmentShaderID);
+		if (fragmentShaderID == 0) {
+			throw new RuntimeException("Error creating shader. Type: " + GL_FRAGMENT_SHADER);
+		}
+		System.out.println(glGetShaderInfoLog(fragmentShaderID, glGetShaderi(fragmentShaderID, GL_INFO_LOG_LENGTH)));
+    glAttachShader(programID, fragmentShaderID);
+
+    glLinkProgram(programID);
+		if (glGetProgrami(programID, GL_LINK_STATUS) == 0) {
+			throw new RuntimeException("Error linking Shader code: " + glGetProgramInfoLog(programID, 1024));
+		}
+		System.out.println(glGetProgramInfoLog(programID, glGetProgrami(programID, GL_INFO_LOG_LENGTH)));
+
+    glDeleteShader(vertexShaderID);
+    glDeleteShader(fragmentShaderID);
+	
+	}
+
+	private void makeShapes2(){
+		
+		 rotateX = 0;
+		 rotateY = 0;
+		 rotateZ = 0;
+
+
+		 float[] cubeCoords = {
+			1,1,1,    -1,1,1,   -1,-1,1,   1,-1,1,      // face #1
+			1,1,1,     1,-1,1,   1,-1,-1,  1,1,-1,      // face #2
+			1,1,1,     1,1,-1,  -1,1,-1,  -1,1,1,       // face #3
+			-1,-1,-1, -1,1,-1,   1,1,-1,   1,-1,-1,     // face #4
+			-1,-1,-1, -1,-1,1,  -1,1,1,   -1,1,-1,      // face #5
+			-1,-1,-1,  1,-1,-1,  1,-1,1,   -1,-1,1  };  // face #6
+
+		float[] cubeFaceColors = {
+			1,0,0,  1,0,0,  1,0,0,  1,0,0,      // face #1 is red
+			0,1,0,  0,1,0,  0,1,0,  0,1,0,      // face #2 is green
+			0,0,1,  0,0,1,  0,0,1,  0,0,1,      // face #3 is blue
+			1,1,0,  1,1,0,  1,1,0,  1,1,0,      // face #4 is yellow
+			0,1,1,  0,1,1,  0,1,1,  0,1,1,      // face #5 is cyan
+			1,0,1,  1,0,1,  1,0,1,  1,0,1,   }; // face #6 is red
+	
+			try (MemoryStack stack = MemoryStack.stackPush()){
+				cubeCoordBuffer = stack.callocFloat(cubeCoords.length);
+				cubeCoordBuffer.put(0,cubeCoords);
+				cubeFaceColorBuffer  = stack.callocFloat(cubeFaceColors.length);
+				cubeFaceColorBuffer.put(0,cubeFaceColors);
+
+			 }
+
+		}
+
+	private void makeShapes(){
+
+		float[] positions = new float[]{
+			-0.5f, 0.5f, 0.0f,
+			-0.5f, -0.5f, 0.0f,
+			0.5f, -0.5f, 0.0f,
+			0.5f, 0.5f, 0.0f,
+};
+
+		float[] colors = new float[]{
+				0.5f, 0.0f, 0.0f,
+				0.5f, 0.5f, 0.0f,
+				0.5f, 0.0f, 0.5f,
+				0.0f, 0.0f, 0.5f
+		};
+		int[] indices = new int[]{
+				0, 1, 2, 0, 2, 3
+		};
+
+		numVertices = indices.length;
+
+		try (MemoryStack stack = MemoryStack.stackPush()) {
+
+			vboIdList = new ArrayList<>();
+
+			vaoId = glGenVertexArrays();
+			glBindVertexArray(vaoId);
+
+			int vboId = glGenVertexArrays();
+			vboIdList.add(vboId);
+			FloatBuffer positionsBuffer = stack.callocFloat(positions.length);
+			positionsBuffer.put(0,positions);
+			glBindBuffer(GL_ARRAY_BUFFER, vboId);
+			glBufferData(GL_ARRAY_BUFFER, positionsBuffer, GL_STATIC_DRAW);
+			glEnableVertexAttribArray(0);
+			glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
+
+            // Color VBO
+			vboId = glGenBuffers();
+			vboIdList.add(vboId);
+			FloatBuffer colorsBuffer = stack.callocFloat(colors.length);
+			colorsBuffer.put(0, colors);
+			glBindBuffer(GL_ARRAY_BUFFER, vboId);
+			glBufferData(GL_ARRAY_BUFFER, colorsBuffer, GL_STATIC_DRAW);
+			glEnableVertexAttribArray(1);
+			glVertexAttribPointer(1, 3, GL_FLOAT, false, 0, 0);
+
+			// Index VBO
+			vboId = glGenBuffers();
+			vboIdList.add(vboId);
+			IntBuffer indicesBuffer = stack.callocInt(indices.length);
+			indicesBuffer.put(0, indices);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vboId);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesBuffer, GL_STATIC_DRAW);
+
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			glBindVertexArray(0);
+			
+			
+			
+
+		}
+	}
+
 
 	private void init() {
 		// Setup an error callback. The default implementation
@@ -83,71 +322,59 @@ public class Main {
 
 		// Make the window visible
 		glfwShowWindow(window);
+		GL.createCapabilities();
+
+		glMatrixMode(GL_PROJECTION);
+		glOrtho(-4, 4, -2, 2, -2, 2);  // simple orthographic projection
+		glMatrixMode(GL_MODELVIEW);
+		glClearColor( 0.5F, 0.5F, 0.5F, 1 );
+		glEnable(GL_DEPTH_TEST);
 	}
 
-	public int DrawStuff() {
-
-		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	public void DrawStuff2() {
+//		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
 
+		
+
 		glLoadIdentity();
+		glTranslated(-2, 0, 0);     // Move cube to left half of window.
+        
+		glRotated(rotateZ,0,0,1);     // Apply rotations.
+		glRotated(rotateY,0,1,0);
+		glRotated(rotateX,1,0,0);
+
 			
+		glVertexPointer( 3, GL_FLOAT, 0, cubeCoordBuffer  );  // Set data type and location, second cube.
+		glColorPointer( 3, GL_FLOAT, 0, cubeFaceColorBuffer  );
 		
-		glBegin(GL_TRIANGLES);                      // Drawing Using Triangles
-			glColor3f(1f,1f,1f);
-			glVertex3f( 0.0f, 0.25f, 0.0f);              // Top
-			glVertex3f(-0.25f,-0.25f, 0.0f);              // Bottom Left
-			glVertex3f( 0.25f,-0.25f, 0.0f);              // Bottom Right
-		glEnd();
+		glEnableClientState( GL_VERTEX_ARRAY );
+		glEnableClientState( GL_COLOR_ARRAY );
 
-		glLoadIdentity();
+ 		glDrawArrays( GL_QUADS, 0, 24 ); // Draw the first cube!
 
-		glTranslatef(-0.5f,0.0f,0.0f); 
-		glScalef(0.2f, 0.2f, 0.2f);
-		glRotatef(180f,0f, 0f,1f);
-		
-		glBegin(GL_TRIANGLES);                      // Drawing Using Triangles
-			glColor3f(1f,0f,0f);
-			glVertex3f( 0.0f, 0.25f, 0.0f);              // Top
-			glVertex3f(-0.25f,-0.25f, 0.0f);              // Bottom Left
-			glVertex3f( 0.25f,-0.25f, 0.0f);              // Bottom Right
-		glEnd();
-
-		glLoadIdentity();
-
-		glRotatef(180f,0f, 0f,1f);
-		glTranslatef(-0.5f,0.0f,0.0f); 
-		glScalef(0.2f, 0.2f, 0.2f);
-		
-		
-		glBegin(GL_TRIANGLES);                      // Drawing Using Triangles
-			glColor3f(0f,1f,0f);
-			glVertex3f( 0.0f, 0.25f, 0.0f);              // Top
-			glVertex3f(-0.25f,-0.25f, 0.0f);              // Bottom Left
-			glVertex3f( 0.25f,-0.25f, 0.0f);              // Bottom Right
-		glEnd();
-
-		glLoadIdentity();
-
-		glRotatef(90f,0f, 0f,1f);
-		glTranslatef(-0.5f,0.0f,0.0f); 
-		glScalef(0.2f, 0.2f, 0.2f);
-		
-		
-		glBegin(GL_TRIANGLES);                      // Drawing Using Triangles
-			glColor3f(0f,1f,0f);
-			glVertex3f( 0.0f, 0.25f, 0.0f);              // Top
-			glColor3f(1f,0f,0f);
-			glVertex3f(-0.25f,-0.25f, 0.0f);              // Bottom Left
-			glColor3f(0f,0f,1f);
-			glVertex3f( 0.25f,-0.25f, 0.0f);              // Bottom Right
-		glEnd();
-
-		// replace GL_TRIANGLES with GL_QUADS for a polygon with more vertices
-
-		return 1;
 	}
 
+public void DrawStuff() {
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
+ 		glViewport(0, 0, 1000,800);
+		
+
+		glUseProgram(programID);
+		if (glGetProgrami(programID, GL_LINK_STATUS) == 0) {			
+			throw new RuntimeException("Error linking Shader code: " + glGetProgramInfoLog(programID, 1024));
+		}
+
+		glBindVertexArray(vaoId);
+    glDrawElements(GL_TRIANGLES, numVertices, GL_UNSIGNED_INT, 0);
+
+		glBindVertexArray(0);
+		glUseProgram(0);
+
+		
+	}
+
+	
 	private void loop() {
 		// This line is critical for LWJGL's interoperation with GLFW's
 		// OpenGL context, or any context that is managed externally.
@@ -155,17 +382,26 @@ public class Main {
 		// creates the GLCapabilities instance and makes the OpenGL
 		// bindings available for use.
 
-		GL.createCapabilities();
+		
 
 		// Set the clear color
-		glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
+		
 
 		// Run the rendering loop until the user has attempted to close
 		// the window or has pressed the ESCAPE key.
 		while ( !glfwWindowShouldClose(window) ) {
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
+			
+			//glViewport(0, 0, 1000,800);
 
-			// DrawStuff();
+			rotateX += 5f;
+			rotateY += 5f;
+			if (rotateX>360) rotateX -= 360f;
+			if (rotateY>360) rotateY -= 360f;
+
+			if (VAO)
+				DrawStuff();
+			else
+				DrawStuff2();
 
 			glfwSwapBuffers(window); // swap the color buffers
 
@@ -174,6 +410,18 @@ public class Main {
 			glfwPollEvents();
 		}
 	}
+
+	public void cleanup() {
+		//vboIdList.forEach(GL30::glDeleteBuffers);
+		glDeleteVertexArrays(vaoId);
+		// Free the window callbacks and destroy the window
+		glfwFreeCallbacks(window);
+		glfwDestroyWindow(window);
+
+		// Terminate GLFW and free the error callback
+		glfwTerminate();
+		glfwSetErrorCallback(null).free();
+}
 
 	public static void main(String[] args) {
 		new Main().run();
