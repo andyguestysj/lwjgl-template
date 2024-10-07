@@ -222,7 +222,8 @@ public class Main {
 				0.0f, 0.0f, 0.5f
 		};
 		int[] indices = new int[]{
-				0, 1, 2, 0, 2, 3
+				0, 1, 2, // first triangle
+				0, 2, 3  // second triangle
 		};
 
 		numVertices = indices.length;
@@ -234,7 +235,7 @@ public class Main {
 			vaoId = glGenVertexArrays();
 			glBindVertexArray(vaoId);
 
-			int vboId = glGenVertexArrays();
+			int vboId = glGenBuffers();
 			vboIdList.add(vboId);
 			FloatBuffer positionsBuffer = stack.callocFloat(positions.length);
 			positionsBuffer.put(0,positions);
@@ -393,8 +394,8 @@ public void DrawStuff() {
 			
 			//glViewport(0, 0, 1000,800);
 
-			rotateX += 5f;
-			rotateY += 5f;
+			rotateX += 2f;
+			rotateY += 2f;
 			if (rotateX>360) rotateX -= 360f;
 			if (rotateY>360) rotateY -= 360f;
 
