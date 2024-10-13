@@ -1,9 +1,11 @@
 package com.example;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.lwjgl.*;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
 import org.lwjgl.system.*;
+
 
 
 import java.util.ArrayList;
@@ -23,12 +25,14 @@ import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
 import static org.lwjgl.opengl.GL11.GL_FLOAT;
 import static org.lwjgl.opengl.GL11.GL_MODELVIEW;
 import static org.lwjgl.opengl.GL11.GL_PROJECTION;
+import static org.lwjgl.opengl.GL11.GL_QUADS;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
 import static org.lwjgl.opengl.GL11.GL_VERTEX_ARRAY;
 import static org.lwjgl.opengl.GL11.glClear;
 import static org.lwjgl.opengl.GL11.glClearColor;
 import static org.lwjgl.opengl.GL11.glColorPointer;
+import static org.lwjgl.opengl.GL11.glDrawArrays;
 import static org.lwjgl.opengl.GL11.glDrawElements;
 import static org.lwjgl.opengl.GL11.glEnable;
 import static org.lwjgl.opengl.GL11.glEnableClientState;
@@ -88,19 +92,29 @@ public class Main {
 	public int fragmentShaderID;	
 	public Map<String, Integer> uniforms;
 
-	
-
 	public FloatBuffer cubeCoordBuffer ;
 	public FloatBuffer cubeFaceColorBuffer ;
 
 	public float rotateX;
 	public float rotateY;
 	public float rotateZ;
+
+	public boolean KEY_A_DOWN = false;
+	public boolean KEY_D_DOWN = false;
+	public boolean KEY_W_DOWN = false;
+	public boolean KEY_S_DOWN = false;
+	public boolean KEY_LEFT_DOWN = false;
+	public boolean KEY_RIGHT_DOWN = false;
+	public boolean KEY_UP_DOWN = false;
+	public boolean KEY_DOWN_DOWN = false;
+
+
+	public float[] camPos;
 	
 
 	public void run() {
 		count=0;
-		VAO = true;
+		VAO = false;
 		System.out.println("Hello LWJGL " + Version.getVersion() + "!");
 
 		init();
@@ -234,7 +248,7 @@ public class Main {
 			vaoId = glGenVertexArrays();
 			glBindVertexArray(vaoId);
 
-			int vboId = glGenVertexArrays();
+			int vboId = glGenBuffers();
 			vboIdList.add(vboId);
 			FloatBuffer positionsBuffer = stack.callocFloat(positions.length);
 			positionsBuffer.put(0,positions);
@@ -270,6 +284,43 @@ public class Main {
 		}
 	}
 
+	public void keyCallBack(int key, int action) {
+
+		if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE) {
+				glfwSetWindowShouldClose(window, true); // We will detect this in the rendering loop				
+		}
+
+		if (key == GLFW_KEY_W && action == GLFW_PRESS) KEY_W_DOWN = true;
+		else if (key == GLFW_KEY_W && action == GLFW_RELEASE) KEY_W_DOWN = false;
+
+		if (key == GLFW_KEY_A && action == GLFW_PRESS) KEY_A_DOWN = true;
+		else if (key == GLFW_KEY_A && action == GLFW_RELEASE) KEY_A_DOWN = false;
+
+		if (key == GLFW_KEY_S && action == GLFW_PRESS) KEY_S_DOWN = true;
+		else if (key == GLFW_KEY_S && action == GLFW_RELEASE) KEY_S_DOWN = false;
+
+		if (key == GLFW_KEY_D && action == GLFW_PRESS) KEY_D_DOWN = true;
+		else if (key == GLFW_KEY_D && action == GLFW_RELEASE) KEY_D_DOWN = false;
+
+		if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) KEY_LEFT_DOWN = true;
+		else if (key == GLFW_KEY_LEFT && action == GLFW_RELEASE) KEY_LEFT_DOWN = false;
+
+		if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) KEY_RIGHT_DOWN = true;
+		else if (key == GLFW_KEY_RIGHT && action == GLFW_RELEASE) KEY_RIGHT_DOWN = false;
+
+		if (key == GLFW_KEY_UP && action == GLFW_PRESS) KEY_UP_DOWN = true;
+		else if (key == GLFW_KEY_UP && action == GLFW_RELEASE) KEY_UP_DOWN = false;
+
+		if (key == GLFW_KEY_DOWN && action == GLFW_PRESS) KEY_DOWN_DOWN = true;
+		else if (key == GLFW_KEY_DOWN && action == GLFW_RELEASE) KEY_DOWN_DOWN = false;
+}
+
+	private void makeCamera(){
+		camPos = new float[] {0f,0f,0f};
+		
+
+
+	}
 
 	private void init() {
 		// Setup an error callback. The default implementation
@@ -290,11 +341,18 @@ public class Main {
 		if ( window == NULL )
 			throw new RuntimeException("Failed to create the GLFW window");
 
-		// Setup a key callback. It will be called every time a key is pressed, repeated or released.
+		/*// Setup a key callback. It will be called every time a key is pressed, repeated or released.
 		glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> {
 			if ( key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE )
 				glfwSetWindowShouldClose(window, true); // We will detect this in the rendering loop
+		});*/
+
+		glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> {
+			keyCallBack(key, action);
 		});
+
+		makeCamera();
+
 
 		// Get the thread stack and push a new frame
 		try ( MemoryStack stack = stackPush() ) {
@@ -326,13 +384,16 @@ public class Main {
 
 		glMatrixMode(GL_PROJECTION);
 		glOrtho(-4, 4, -2, 2, -2, 2);  // simple orthographic projection
+		
 		glMatrixMode(GL_MODELVIEW);
 		glClearColor( 0.5F, 0.5F, 0.5F, 1 );
 		glEnable(GL_DEPTH_TEST);
+
+
 	}
 
 	public void DrawStuff2() {
-//		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
 
 		
@@ -351,11 +412,14 @@ public class Main {
 		glEnableClientState( GL_VERTEX_ARRAY );
 		glEnableClientState( GL_COLOR_ARRAY );
 
+		glTranslatef(-camPos[0],-camPos[1],-camPos[2]);
+
  		glDrawArrays( GL_QUADS, 0, 24 ); // Draw the first cube!
 
 	}
 
 public void DrawStuff() {
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
  		glViewport(0, 0, 1000,800);
 		
@@ -374,6 +438,36 @@ public void DrawStuff() {
 		
 	}
 
+	private void do_key_stuff(){
+		if (KEY_D_DOWN){
+			rotateX += 5f;
+			if (rotateX>360f) rotateX -= 360f;
+		}
+		if (KEY_A_DOWN){
+			rotateX -= 5f;
+			if (rotateX<0) rotateX += 360f;
+		}
+		if (KEY_W_DOWN){
+			rotateY += 5f;
+			if (rotateY>360f) rotateY -= 360f;
+		}
+		if (KEY_S_DOWN){
+			rotateY -= 5f;
+			if (rotateY<0) rotateY += 360f;
+		}
+		if (KEY_LEFT_DOWN){
+			camPos[0] -= 0.1f;
+		}
+		if (KEY_RIGHT_DOWN){
+			camPos[0] += 0.1f;
+		}
+		if (KEY_DOWN_DOWN){
+			camPos[1] -= 0.1f;
+		}
+		if (KEY_UP_DOWN){
+			camPos[1] += 0.1f;
+		}
+	}
 	
 	private void loop() {
 		// This line is critical for LWJGL's interoperation with GLFW's
@@ -393,10 +487,7 @@ public void DrawStuff() {
 			
 			//glViewport(0, 0, 1000,800);
 
-			rotateX += 5f;
-			rotateY += 5f;
-			if (rotateX>360) rotateX -= 360f;
-			if (rotateY>360) rotateY -= 360f;
+			do_key_stuff();
 
 			if (VAO)
 				DrawStuff();
