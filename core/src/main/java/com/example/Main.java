@@ -236,7 +236,8 @@ public class Main {
 				0.0f, 0.0f, 0.5f
 		};
 		int[] indices = new int[]{
-				0, 1, 2, 0, 2, 3
+				0, 1, 2, // first triangle
+				0, 2, 3  // second triangle
 		};
 
 		numVertices = indices.length;
@@ -249,6 +250,7 @@ public class Main {
 			glBindVertexArray(vaoId);
 
 			int vboId = glGenBuffers();
+			
 			vboIdList.add(vboId);
 			FloatBuffer positionsBuffer = stack.callocFloat(positions.length);
 			positionsBuffer.put(0,positions);
