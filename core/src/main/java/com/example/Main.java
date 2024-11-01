@@ -385,7 +385,7 @@ public class Main {
 		GL.createCapabilities();
 
 		glMatrixMode(GL_PROJECTION);
-		glOrtho(-4, 4, -2, 2, -2, 2);  // simple orthographic projection
+		glOrtho(-8, 8, -8, 8, -6, 6);  // simple orthographic projection
 		
 		glMatrixMode(GL_MODELVIEW);
 		glClearColor( 0.5F, 0.5F, 0.5F, 1 );
@@ -401,6 +401,10 @@ public class Main {
 		
 
 		glLoadIdentity();
+		
+		glTranslatef(-camPos[0],-camPos[2],-camPos[1]);
+
+		
 		glTranslated(-2, 0, 0);     // Move cube to left half of window.
         
 		glRotated(rotateZ,0,0,1);     // Apply rotations.
@@ -414,8 +418,8 @@ public class Main {
 		glEnableClientState( GL_VERTEX_ARRAY );
 		glEnableClientState( GL_COLOR_ARRAY );
 
-		glTranslatef(-camPos[0],-camPos[1],-camPos[2]);
-
+		
+		
  		glDrawArrays( GL_QUADS, 0, 24 ); // Draw the first cube!
 
 	}
