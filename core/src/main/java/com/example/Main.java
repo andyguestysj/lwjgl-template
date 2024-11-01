@@ -41,6 +41,7 @@ import static org.lwjgl.opengl.GL11.glMatrixMode;
 import static org.lwjgl.opengl.GL11.glOrtho;
 import static org.lwjgl.opengl.GL11.glRotated;
 import static org.lwjgl.opengl.GL11.glTranslated;
+import static org.lwjgl.opengl.GL11.glTranslatef;
 import static org.lwjgl.opengl.GL11.glVertexPointer;
 import static org.lwjgl.opengl.GL11.glViewport;
 import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
@@ -77,7 +78,6 @@ import java.nio.IntBuffer;
 
 public class Main {
 
-	public boolean VAO;
 	// The window handle
 	private long window;
 
@@ -86,6 +86,10 @@ public class Main {
 	public int numVertices;
 	public int vaoId;	
   public List<Integer> vboIdList;
+
+	public int numVerticesGround;
+	public int vaoIdGround;	
+  public List<Integer> vboIdListGround;
 
 	public int programID;
 	public int vertexShaderID;
@@ -109,38 +113,85 @@ public class Main {
 	public boolean KEY_DOWN_DOWN = false;
 
 
-	public float[] camPos;
+	private static final float FOV = (float) Math.toRadians(60.0f);
+	private static final float Z_NEAR = 0.01f;
+	private static final float Z_FAR = 1000.f;
+	private Matrix4f projectionMatrix;
+	private Matrix4f worldMatrix;
+
+	public int WIDTH = 1000;
+	public int HEIGHT = 1000;
+
+	Vector3f offset;
+	Vector3f rotation;
+	float scale;
+	
 	
 
-	public void run() {
+	public void run() throws Exception {
 		count=0;
-		VAO = false;
-		System.out.println("Hello LWJGL " + Version.getVersion() + "!");
+		uniforms = new HashMap<>();
+
+		rotation = new Vector3f(0,0,0);
+		offset = new Vector3f(0,0,-5f);
+		scale = 1;
 
 		init();
-				
-		makeShader();
 		
-		if (VAO)
-			makeShapes();
-		else
-			makeShapes2();
+		makeShader();
 
+		worldMatrix = new Matrix4f();
+		createUniform("projectionMatrix");
+		createUniform("worldMatrix");
+
+		makeShapes();
+		makeGround();
+	
 		loop();
 		cleanup();
 	}
 
+	public Matrix4f getWorldMatrix() {
+		worldMatrix.identity().translate(offset).
+						rotateX((float)Math.toRadians(rotation.x)).
+						rotateY((float)Math.toRadians(rotation.y)).
+						rotateZ((float)Math.toRadians(rotation.z)).
+						scale(scale);
+		return worldMatrix;
+	}
+
+	public void createUniform(String uniformName) throws Exception {
+    int uniformLocation = glGetUniformLocation(programID, uniformName);
+    if (uniformLocation < 0) {
+			System.out.println("createUniform error");
+      throw new Exception("Could not find uniform:" + uniformName);				
+    }
+    uniforms.put(uniformName, uniformLocation);
+	}
+
+	public void setUniform(String uniformName, Matrix4f value) {
+		// Dump the matrix into a float buffer
+		try (MemoryStack stack = MemoryStack.stackPush()) {
+			FloatBuffer fb = stack.mallocFloat(16);
+			value.get(fb);
+			glUniformMatrix4fv(uniforms.get(uniformName), false, fb);
+		}
+	}
 
 	private void makeShader(){ 
 	
-		String vshaderSource[ ] =
+			//"uniform mat4 projectionMatrix;",
+			//"{ gl_Position = projectionMatrix * vec4(position, 1.0); \n",
+			String vshaderSource[ ] =
 		{ 
 			"#version 330 \n",
 			"layout (location=0) in vec3 position; \n",
 			"layout (location=1) in vec3 color; \n",
 			"out vec3 outColor; \n",
-			"void main() \n",
-			"{ gl_Position = vec4(position, 1.0); \n",
+			"uniform mat4 worldMatrix;",
+			"uniform mat4 projectionMatrix;",
+			"void main() \n",			
+			"{ gl_Position = projectionMatrix * worldMatrix * vec4(position, 1.0); \n",
 			" outColor = color;}"
 			
 		};
@@ -187,57 +238,52 @@ public class Main {
 	
 	}
 
-	private void makeShapes2(){
-		
-		 rotateX = 0;
-		 rotateY = 0;
-		 rotateZ = 0;
-
-
-		 float[] cubeCoords = {
-			1,1,1,    -1,1,1,   -1,-1,1,   1,-1,1,      // face #1
-			1,1,1,     1,-1,1,   1,-1,-1,  1,1,-1,      // face #2
-			1,1,1,     1,1,-1,  -1,1,-1,  -1,1,1,       // face #3
-			-1,-1,-1, -1,1,-1,   1,1,-1,   1,-1,-1,     // face #4
-			-1,-1,-1, -1,-1,1,  -1,1,1,   -1,1,-1,      // face #5
-			-1,-1,-1,  1,-1,-1,  1,-1,1,   -1,-1,1  };  // face #6
-
-		float[] cubeFaceColors = {
-			1,0,0,  1,0,0,  1,0,0,  1,0,0,      // face #1 is red
-			0,1,0,  0,1,0,  0,1,0,  0,1,0,      // face #2 is green
-			0,0,1,  0,0,1,  0,0,1,  0,0,1,      // face #3 is blue
-			1,1,0,  1,1,0,  1,1,0,  1,1,0,      // face #4 is yellow
-			0,1,1,  0,1,1,  0,1,1,  0,1,1,      // face #5 is cyan
-			1,0,1,  1,0,1,  1,0,1,  1,0,1,   }; // face #6 is red
 	
-			try (MemoryStack stack = MemoryStack.stackPush()){
-				cubeCoordBuffer = stack.callocFloat(cubeCoords.length);
-				cubeCoordBuffer.put(0,cubeCoords);
-				cubeFaceColorBuffer  = stack.callocFloat(cubeFaceColors.length);
-				cubeFaceColorBuffer.put(0,cubeFaceColors);
-
-			 }
-
-		}
 
 	private void makeShapes(){
 
 		float[] positions = new float[]{
-			-0.5f, 0.5f, 0.0f,
-			-0.5f, -0.5f, 0.0f,
-			0.5f, -0.5f, 0.0f,
-			0.5f, 0.5f, 0.0f,
+			// VO
+			-0.5f,  0.5f,  0.5f,
+			// V1
+			-0.5f, -0.5f,  0.5f,
+			// V2
+			0.5f, -0.5f,  0.5f,
+			// V3
+			0.5f,  0.5f,  0.5f,
+			// V4
+			-0.5f,  0.5f, -0.5f,
+			// V5
+			0.5f,  0.5f, -0.5f,
+			// V6
+			-0.5f, -0.5f, -0.5f,
+			// V7
+			0.5f, -0.5f, -0.5f,
 };
 
 		float[] colors = new float[]{
-				0.5f, 0.0f, 0.0f,
-				0.5f, 0.5f, 0.0f,
-				0.5f, 0.0f, 0.5f,
-				0.0f, 0.0f, 0.5f
+			0.5f, 0.0f, 0.0f,
+			0.0f, 0.5f, 0.0f,
+			0.0f, 0.0f, 0.5f,
+			0.0f, 0.5f, 0.5f,
+			0.5f, 0.0f, 0.0f,
+			0.0f, 0.5f, 0.0f,
+			0.0f, 0.0f, 0.5f,
+			0.0f, 0.5f, 0.5f,
 		};
 		int[] indices = new int[]{
-				0, 1, 2, // first triangle
-				0, 2, 3  // second triangle
+		 // Front face
+		 0, 1, 3, 3, 1, 2,
+		 // Top Face
+		 4, 0, 3, 5, 4, 3,
+		 // Right face
+		 3, 2, 7, 5, 3, 7,
+		 // Left face
+		 6, 1, 0, 6, 0, 4,
+		 // Bottom face
+		 2, 1, 6, 2, 6, 7,
+		 // Back face
+		 7, 6, 4, 7, 4, 5,
 		};
 
 		numVertices = indices.length;
@@ -286,6 +332,73 @@ public class Main {
 		}
 	}
 
+	private void makeGround(){
+		
+		float[] positions = new float[]{
+			-100f, -1f, -100f,
+			-100f, -1f, 100f,
+			100f, -1f, 100f,
+			100f, -1f, -100f
+};
+
+		float[] colors = new float[]{
+				0.25f, 0.25f, 0.25f,
+				0.25f, 0.25f, 0.25f,
+				0.25f, 0.25f, 0.25f,
+				0.25f, 0.25f, 0.25f
+		};
+
+		int[] indices = new int[]{
+			0, 1, 2, // first triangle
+			0, 2, 3  // second triangle
+	};
+
+		numVerticesGround = indices.length;
+
+		try (MemoryStack stack = MemoryStack.stackPush()) {
+
+			vboIdListGround = new ArrayList<>();
+
+			vaoIdGround = glGenVertexArrays();
+			glBindVertexArray(vaoIdGround);
+
+			int vboId = glGenBuffers();
+			
+			vboIdListGround.add(vboId);
+			FloatBuffer positionsBuffer = stack.callocFloat(positions.length);
+			positionsBuffer.put(0,positions);
+			glBindBuffer(GL_ARRAY_BUFFER, vboId);
+			glBufferData(GL_ARRAY_BUFFER, positionsBuffer, GL_STATIC_DRAW);
+			glEnableVertexAttribArray(0);
+			glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
+
+            // Color VBO
+			vboId = glGenBuffers();
+			vboIdListGround.add(vboId);
+			FloatBuffer colorsBuffer = stack.callocFloat(colors.length);
+			colorsBuffer.put(0, colors);
+			glBindBuffer(GL_ARRAY_BUFFER, vboId);
+			glBufferData(GL_ARRAY_BUFFER, colorsBuffer, GL_STATIC_DRAW);
+			glEnableVertexAttribArray(1);
+			glVertexAttribPointer(1, 3, GL_FLOAT, false, 0, 0);
+
+			// Index VBO
+			vboId = glGenBuffers();
+			vboIdListGround.add(vboId);
+			IntBuffer indicesBuffer = stack.callocInt(indices.length);
+			indicesBuffer.put(0, indices);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vboId);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesBuffer, GL_STATIC_DRAW);
+
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			glBindVertexArray(0);
+			
+			
+			
+
+		}
+	}
+
 	public void keyCallBack(int key, int action) {
 
 		if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE) {
@@ -317,12 +430,7 @@ public class Main {
 		else if (key == GLFW_KEY_DOWN && action == GLFW_RELEASE) KEY_DOWN_DOWN = false;
 }
 
-	private void makeCamera(){
-		camPos = new float[] {0f,0f,0f};
-		
-
-
-	}
+	
 
 	private void init() {
 		// Setup an error callback. The default implementation
@@ -339,7 +447,7 @@ public class Main {
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
 
 		// Create the window
-		window = glfwCreateWindow(1000, 800, "Hello World!", NULL, NULL);
+		window = glfwCreateWindow(WIDTH, HEIGHT, "Hello World!", NULL, NULL);
 		if ( window == NULL )
 			throw new RuntimeException("Failed to create the GLFW window");
 
@@ -353,7 +461,8 @@ public class Main {
 			keyCallBack(key, action);
 		});
 
-		makeCamera();
+		
+		
 
 
 		// Get the thread stack and push a new frame
@@ -383,61 +492,45 @@ public class Main {
 		// Make the window visible
 		glfwShowWindow(window);
 		GL.createCapabilities();
+		
+		float aspectRatio = (float) WIDTH / HEIGHT;
+		projectionMatrix = new Matrix4f().perspective(FOV, aspectRatio,	Z_NEAR, Z_FAR);
+		
 
-		glMatrixMode(GL_PROJECTION);
-		glOrtho(-8, 8, -8, 8, -6, 6);  // simple orthographic projection
+		//glMatrixMode(GL_PROJECTION);
+		//glOrtho(-8, 8, -8, 8, -6, 6);  // simple orthographic projection
 		
 		glMatrixMode(GL_MODELVIEW);
-		glClearColor( 0.5F, 0.5F, 0.5F, 1 );
+		glClearColor( 0.0F, 0.0F, 0.0F, 1 );
 		glEnable(GL_DEPTH_TEST);
 
 
 	}
 
-	public void DrawStuff2() {
-		
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
-
-		
-
-		glLoadIdentity();
-		
-		glTranslatef(-camPos[0],-camPos[2],-camPos[1]);
-
-		
-		glTranslated(-2, 0, 0);     // Move cube to left half of window.
-        
-		glRotated(rotateZ,0,0,1);     // Apply rotations.
-		glRotated(rotateY,0,1,0);
-		glRotated(rotateX,1,0,0);
-
-			
-		glVertexPointer( 3, GL_FLOAT, 0, cubeCoordBuffer  );  // Set data type and location, second cube.
-		glColorPointer( 3, GL_FLOAT, 0, cubeFaceColorBuffer  );
-		
-		glEnableClientState( GL_VERTEX_ARRAY );
-		glEnableClientState( GL_COLOR_ARRAY );
-
-		
-		
- 		glDrawArrays( GL_QUADS, 0, 24 ); // Draw the first cube!
-
-	}
 
 public void DrawStuff() {
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
- 		glViewport(0, 0, 1000,800);
+ 		//glViewport(0, 0, WIDTH,HEIGHT);
 		
 
 		glUseProgram(programID);
 		if (glGetProgrami(programID, GL_LINK_STATUS) == 0) {			
 			throw new RuntimeException("Error linking Shader code: " + glGetProgramInfoLog(programID, 1024));
 		}
+		setUniform("projectionMatrix", projectionMatrix);
+
+		Matrix4f localWorldMatrix = getWorldMatrix();
+		setUniform("worldMatrix", localWorldMatrix);
+
 
 		glBindVertexArray(vaoId);
     glDrawElements(GL_TRIANGLES, numVertices, GL_UNSIGNED_INT, 0);
 
+		glBindVertexArray(vaoIdGround);		
+    glDrawElements(GL_TRIANGLES, numVerticesGround, GL_UNSIGNED_INT, 0);
+
+		
 		glBindVertexArray(0);
 		glUseProgram(0);
 
@@ -445,34 +538,38 @@ public void DrawStuff() {
 	}
 
 	private void do_key_stuff(){
+
 		if (KEY_D_DOWN){
-			rotateX += 5f;
-			if (rotateX>360f) rotateX -= 360f;
+			rotation.y += 1f;
+			if (rotation.y>360f) rotation.y -= 360f;
 		}
 		if (KEY_A_DOWN){
-			rotateX -= 5f;
-			if (rotateX<0) rotateX += 360f;
+			rotation.y -= 1f;
+			if (rotation.y<0) rotation.y += 360f;
 		}
 		if (KEY_W_DOWN){
-			rotateY += 5f;
-			if (rotateY>360f) rotateY -= 360f;
+			rotation.x += 1f;
+			if (rotation.z>360f) rotation.z -= 360f;
 		}
 		if (KEY_S_DOWN){
-			rotateY -= 5f;
-			if (rotateY<0) rotateY += 360f;
+			rotation.x -= 1f;
+			if (rotation.z<0f) rotation.z += 360f;
 		}
+
+
 		if (KEY_LEFT_DOWN){
-			camPos[0] -= 0.1f;
+			offset.x += 0.01f;
 		}
 		if (KEY_RIGHT_DOWN){
-			camPos[0] += 0.1f;
+			offset.x -= 0.01f;
 		}
 		if (KEY_DOWN_DOWN){
-			camPos[1] -= 0.1f;
+			offset.z -= 0.01f;
 		}
 		if (KEY_UP_DOWN){
-			camPos[1] += 0.1f;
+			offset.z += 0.01f;
 		}
+		
 	}
 	
 	private void loop() {
@@ -495,10 +592,7 @@ public void DrawStuff() {
 
 			do_key_stuff();
 
-			if (VAO)
 				DrawStuff();
-			else
-				DrawStuff2();
 
 			glfwSwapBuffers(window); // swap the color buffers
 
@@ -520,7 +614,7 @@ public void DrawStuff() {
 		glfwSetErrorCallback(null).free();
 }
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws Exception {
 		new Main().run();
 	}
 
