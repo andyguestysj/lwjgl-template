@@ -72,8 +72,14 @@ import static org.lwjgl.opengl.GL20.glUseProgram;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 import static org.lwjgl.opengl.GL30.*;
 
+import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+
+import com.example.*;
 
 
 public class Main {
@@ -82,22 +88,14 @@ public class Main {
 	private long window;
 
 	public int count;
-	
-	public int numVertices;
-	public int vaoId;	
-  public List<Integer> vboIdList;
 
-	public int numVerticesGround;
-	public int vaoIdGround;	
-  public List<Integer> vboIdListGround;
 
 	public int programID;
-	public int vertexShaderID;
-	public int fragmentShaderID;	
 	public Map<String, Integer> uniforms;
 
-	public FloatBuffer cubeCoordBuffer ;
-	public FloatBuffer cubeFaceColorBuffer ;
+	public Mesh cube;
+	public Mesh ground;
+
 
 	public float rotateX;
 	public float rotateY;
@@ -126,7 +124,9 @@ public class Main {
 	Vector3f rotation;
 	float scale;
 	
-	
+	public static void main(String[] args) throws Exception {
+		new Main().run();
+	}
 
 	public void run() throws Exception {
 		count=0;
@@ -138,17 +138,122 @@ public class Main {
 
 		init();
 		
-		makeShader();
+		programID = Shaders.makeShaders();
 
 		worldMatrix = new Matrix4f();
 		createUniform("projectionMatrix");
 		createUniform("worldMatrix");
 
-		makeShapes();
-		makeGround();
+		cube = makeCube();
+		ground = makeGround();
 	
 		loop();
 		cleanup();
+	}
+
+	private void init() {
+		// Setup an error callback. The default implementation
+		// will print the error message in System.err.
+		GLFWErrorCallback.createPrint(System.err).set();
+
+		// Initialize GLFW. Most GLFW functions will not work before doing this.
+		if ( !glfwInit() )
+			throw new IllegalStateException("Unable to initialize GLFW");
+
+		// Configure GLFW
+		glfwDefaultWindowHints(); // optional, the current window hints are already the default
+		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // the window will stay hidden after creation
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
+
+		// Create the window
+		window = glfwCreateWindow(WIDTH, HEIGHT, "Hello World!", NULL, NULL);
+		if ( window == NULL )
+			throw new RuntimeException("Failed to create the GLFW window");
+
+		glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> {
+			keyCallBack(key, action);
+		});
+
+		// Get the thread stack and push a new frame
+		try ( MemoryStack stack = stackPush() ) {
+			IntBuffer pWidth = stack.mallocInt(1); // int*
+			IntBuffer pHeight = stack.mallocInt(1); // int*
+
+			// Get the window size passed to glfwCreateWindow
+			glfwGetWindowSize(window, pWidth, pHeight);
+
+			// Get the resolution of the primary monitor
+			GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+
+			// Center the window
+			glfwSetWindowPos(
+				window,
+				(vidmode.width() - pWidth.get(0)) / 2,
+				(vidmode.height() - pHeight.get(0)) / 2
+			);
+		} // the stack frame is popped automatically
+
+		// Make the OpenGL context current
+		glfwMakeContextCurrent(window);
+		// Enable v-sync
+		glfwSwapInterval(1);
+
+		// Make the window visible
+		glfwShowWindow(window);
+		GL.createCapabilities();
+		
+		float aspectRatio = (float) WIDTH / HEIGHT;
+		projectionMatrix = new Matrix4f().perspective(FOV, aspectRatio,	Z_NEAR, Z_FAR);
+		
+		glMatrixMode(GL_MODELVIEW);
+		glClearColor( 0.0F, 0.0F, 0.0F, 1 );
+		glEnable(GL_DEPTH_TEST);
+	}
+
+
+	private void loop() {
+		// Run the rendering loop until the user has attempted to close
+		// the window or has pressed the ESCAPE key.
+		while ( !glfwWindowShouldClose(window) ) {		
+			do_key_stuff();
+
+			Render();
+
+			glfwSwapBuffers(window); // swap the color buffers
+
+			// Poll for window events. The key callback above will only be
+			// invoked during this call.
+			glfwPollEvents();
+		}
+	}
+
+	public void Render() {
+
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
+ 		//glViewport(0, 0, WIDTH,HEIGHT);
+		
+
+		glUseProgram(programID);
+		if (glGetProgrami(programID, GL_LINK_STATUS) == 0) {			
+			throw new RuntimeException("Error linking Shader code: " + glGetProgramInfoLog(programID, 1024));
+		}
+		setUniform("projectionMatrix", projectionMatrix);
+
+		Matrix4f localWorldMatrix = getWorldMatrix();
+		setUniform("worldMatrix", localWorldMatrix);
+
+
+		glBindVertexArray(cube.getMeshID());
+    glDrawElements(GL_TRIANGLES, cube.getVertexCount(), GL_UNSIGNED_INT, 0);
+
+		glBindVertexArray(ground.getMeshID());		
+    glDrawElements(GL_TRIANGLES, ground.getVertexCount(), GL_UNSIGNED_INT, 0);
+
+		
+		glBindVertexArray(0);
+		glUseProgram(0);
+
+		
 	}
 
 	public Matrix4f getWorldMatrix() {
@@ -178,69 +283,7 @@ public class Main {
 		}
 	}
 
-	private void makeShader(){ 
-	
-			//"uniform mat4 projectionMatrix;",
-			//"{ gl_Position = projectionMatrix * vec4(position, 1.0); \n",
-			String vshaderSource[ ] =
-		{ 
-			"#version 330 \n",
-			"layout (location=0) in vec3 position; \n",
-			"layout (location=1) in vec3 color; \n",
-			"out vec3 outColor; \n",
-			"uniform mat4 worldMatrix;",
-			"uniform mat4 projectionMatrix;",
-			"void main() \n",			
-			"{ gl_Position = projectionMatrix * worldMatrix * vec4(position, 1.0); \n",
-			" outColor = color;}"
-			
-		};
-
-		String fshaderSource[ ] =
-		{ "#version 330 \n",
-			"in vec3 outColor; \n",
-			"out vec4 fragColor; \n",
-			"void main(void) \n",
-			"{ fragColor = vec4(outColor, 1.0); }"
-		};
-
-    
-		int count=0;
-		
-		programID = glCreateProgram();
-
-		vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShaderID, vshaderSource);
-    glCompileShader(vertexShaderID);
-		if (vertexShaderID == 0) {
-			throw new RuntimeException("Error creating shader. Type: " + GL_VERTEX_SHADER);
-		}
-		System.out.println(glGetShaderInfoLog(vertexShaderID, glGetShaderi(vertexShaderID, GL_INFO_LOG_LENGTH)));
-    glAttachShader(programID, vertexShaderID);
-
-		fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShaderID, fshaderSource);
-    glCompileShader(fragmentShaderID);
-		if (fragmentShaderID == 0) {
-			throw new RuntimeException("Error creating shader. Type: " + GL_FRAGMENT_SHADER);
-		}
-		System.out.println(glGetShaderInfoLog(fragmentShaderID, glGetShaderi(fragmentShaderID, GL_INFO_LOG_LENGTH)));
-    glAttachShader(programID, fragmentShaderID);
-
-    glLinkProgram(programID);
-		if (glGetProgrami(programID, GL_LINK_STATUS) == 0) {
-			throw new RuntimeException("Error linking Shader code: " + glGetProgramInfoLog(programID, 1024));
-		}
-		System.out.println(glGetProgramInfoLog(programID, glGetProgrami(programID, GL_INFO_LOG_LENGTH)));
-
-    glDeleteShader(vertexShaderID);
-    glDeleteShader(fragmentShaderID);
-	
-	}
-
-	
-
-	private void makeShapes(){
+	public Mesh makeCube(){
 
 		float[] positions = new float[]{
 			// VO
@@ -286,53 +329,11 @@ public class Main {
 		 7, 6, 4, 7, 4, 5,
 		};
 
-		numVertices = indices.length;
+		return new Mesh(positions, colors, indices);
 
-		try (MemoryStack stack = MemoryStack.stackPush()) {
-
-			vboIdList = new ArrayList<>();
-
-			vaoId = glGenVertexArrays();
-			glBindVertexArray(vaoId);
-
-			int vboId = glGenBuffers();
-			
-			vboIdList.add(vboId);
-			FloatBuffer positionsBuffer = stack.callocFloat(positions.length);
-			positionsBuffer.put(0,positions);
-			glBindBuffer(GL_ARRAY_BUFFER, vboId);
-			glBufferData(GL_ARRAY_BUFFER, positionsBuffer, GL_STATIC_DRAW);
-			glEnableVertexAttribArray(0);
-			glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
-
-            // Color VBO
-			vboId = glGenBuffers();
-			vboIdList.add(vboId);
-			FloatBuffer colorsBuffer = stack.callocFloat(colors.length);
-			colorsBuffer.put(0, colors);
-			glBindBuffer(GL_ARRAY_BUFFER, vboId);
-			glBufferData(GL_ARRAY_BUFFER, colorsBuffer, GL_STATIC_DRAW);
-			glEnableVertexAttribArray(1);
-			glVertexAttribPointer(1, 3, GL_FLOAT, false, 0, 0);
-
-			// Index VBO
-			vboId = glGenBuffers();
-			vboIdList.add(vboId);
-			IntBuffer indicesBuffer = stack.callocInt(indices.length);
-			indicesBuffer.put(0, indices);
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vboId);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesBuffer, GL_STATIC_DRAW);
-
-			glBindBuffer(GL_ARRAY_BUFFER, 0);
-			glBindVertexArray(0);
-			
-			
-			
-
-		}
 	}
 
-	private void makeGround(){
+	private Mesh makeGround(){
 		
 		float[] positions = new float[]{
 			-100f, -1f, -100f,
@@ -353,51 +354,16 @@ public class Main {
 			0, 2, 3  // second triangle
 	};
 
-		numVerticesGround = indices.length;
-
-		try (MemoryStack stack = MemoryStack.stackPush()) {
-
-			vboIdListGround = new ArrayList<>();
-
-			vaoIdGround = glGenVertexArrays();
-			glBindVertexArray(vaoIdGround);
-
-			int vboId = glGenBuffers();
-			
-			vboIdListGround.add(vboId);
-			FloatBuffer positionsBuffer = stack.callocFloat(positions.length);
-			positionsBuffer.put(0,positions);
-			glBindBuffer(GL_ARRAY_BUFFER, vboId);
-			glBufferData(GL_ARRAY_BUFFER, positionsBuffer, GL_STATIC_DRAW);
-			glEnableVertexAttribArray(0);
-			glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
-
-            // Color VBO
-			vboId = glGenBuffers();
-			vboIdListGround.add(vboId);
-			FloatBuffer colorsBuffer = stack.callocFloat(colors.length);
-			colorsBuffer.put(0, colors);
-			glBindBuffer(GL_ARRAY_BUFFER, vboId);
-			glBufferData(GL_ARRAY_BUFFER, colorsBuffer, GL_STATIC_DRAW);
-			glEnableVertexAttribArray(1);
-			glVertexAttribPointer(1, 3, GL_FLOAT, false, 0, 0);
-
-			// Index VBO
-			vboId = glGenBuffers();
-			vboIdListGround.add(vboId);
-			IntBuffer indicesBuffer = stack.callocInt(indices.length);
-			indicesBuffer.put(0, indices);
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vboId);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesBuffer, GL_STATIC_DRAW);
-
-			glBindBuffer(GL_ARRAY_BUFFER, 0);
-			glBindVertexArray(0);
-			
-			
-			
-
-		}
+	return new Mesh(positions, colors, indices);
 	}
+
+
+
+	
+
+
+
+
 
 	public void keyCallBack(int key, int action) {
 
@@ -429,113 +395,6 @@ public class Main {
 		if (key == GLFW_KEY_DOWN && action == GLFW_PRESS) KEY_DOWN_DOWN = true;
 		else if (key == GLFW_KEY_DOWN && action == GLFW_RELEASE) KEY_DOWN_DOWN = false;
 }
-
-	
-
-	private void init() {
-		// Setup an error callback. The default implementation
-		// will print the error message in System.err.
-		GLFWErrorCallback.createPrint(System.err).set();
-
-		// Initialize GLFW. Most GLFW functions will not work before doing this.
-		if ( !glfwInit() )
-			throw new IllegalStateException("Unable to initialize GLFW");
-
-		// Configure GLFW
-		glfwDefaultWindowHints(); // optional, the current window hints are already the default
-		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // the window will stay hidden after creation
-		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
-
-		// Create the window
-		window = glfwCreateWindow(WIDTH, HEIGHT, "Hello World!", NULL, NULL);
-		if ( window == NULL )
-			throw new RuntimeException("Failed to create the GLFW window");
-
-		/*// Setup a key callback. It will be called every time a key is pressed, repeated or released.
-		glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> {
-			if ( key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE )
-				glfwSetWindowShouldClose(window, true); // We will detect this in the rendering loop
-		});*/
-
-		glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> {
-			keyCallBack(key, action);
-		});
-
-		
-		
-
-
-		// Get the thread stack and push a new frame
-		try ( MemoryStack stack = stackPush() ) {
-			IntBuffer pWidth = stack.mallocInt(1); // int*
-			IntBuffer pHeight = stack.mallocInt(1); // int*
-
-			// Get the window size passed to glfwCreateWindow
-			glfwGetWindowSize(window, pWidth, pHeight);
-
-			// Get the resolution of the primary monitor
-			GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-
-			// Center the window
-			glfwSetWindowPos(
-				window,
-				(vidmode.width() - pWidth.get(0)) / 2,
-				(vidmode.height() - pHeight.get(0)) / 2
-			);
-		} // the stack frame is popped automatically
-
-		// Make the OpenGL context current
-		glfwMakeContextCurrent(window);
-		// Enable v-sync
-		glfwSwapInterval(1);
-
-		// Make the window visible
-		glfwShowWindow(window);
-		GL.createCapabilities();
-		
-		float aspectRatio = (float) WIDTH / HEIGHT;
-		projectionMatrix = new Matrix4f().perspective(FOV, aspectRatio,	Z_NEAR, Z_FAR);
-		
-
-		//glMatrixMode(GL_PROJECTION);
-		//glOrtho(-8, 8, -8, 8, -6, 6);  // simple orthographic projection
-		
-		glMatrixMode(GL_MODELVIEW);
-		glClearColor( 0.0F, 0.0F, 0.0F, 1 );
-		glEnable(GL_DEPTH_TEST);
-
-
-	}
-
-
-public void DrawStuff() {
-
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
- 		//glViewport(0, 0, WIDTH,HEIGHT);
-		
-
-		glUseProgram(programID);
-		if (glGetProgrami(programID, GL_LINK_STATUS) == 0) {			
-			throw new RuntimeException("Error linking Shader code: " + glGetProgramInfoLog(programID, 1024));
-		}
-		setUniform("projectionMatrix", projectionMatrix);
-
-		Matrix4f localWorldMatrix = getWorldMatrix();
-		setUniform("worldMatrix", localWorldMatrix);
-
-
-		glBindVertexArray(vaoId);
-    glDrawElements(GL_TRIANGLES, numVertices, GL_UNSIGNED_INT, 0);
-
-		glBindVertexArray(vaoIdGround);		
-    glDrawElements(GL_TRIANGLES, numVerticesGround, GL_UNSIGNED_INT, 0);
-
-		
-		glBindVertexArray(0);
-		glUseProgram(0);
-
-		
-	}
 
 	private void do_key_stuff(){
 
@@ -572,39 +431,12 @@ public void DrawStuff() {
 		
 	}
 	
-	private void loop() {
-		// This line is critical for LWJGL's interoperation with GLFW's
-		// OpenGL context, or any context that is managed externally.
-		// LWJGL detects the context that is current in the current thread,
-		// creates the GLCapabilities instance and makes the OpenGL
-		// bindings available for use.
-
-		
-
-		// Set the clear color
-		
-
-		// Run the rendering loop until the user has attempted to close
-		// the window or has pressed the ESCAPE key.
-		while ( !glfwWindowShouldClose(window) ) {
-			
-			//glViewport(0, 0, 1000,800);
-
-			do_key_stuff();
-
-				DrawStuff();
-
-			glfwSwapBuffers(window); // swap the color buffers
-
-			// Poll for window events. The key callback above will only be
-			// invoked during this call.
-			glfwPollEvents();
-		}
-	}
+	
 
 	public void cleanup() {
 		//vboIdList.forEach(GL30::glDeleteBuffers);
-		glDeleteVertexArrays(vaoId);
+		glDeleteVertexArrays(cube.getMeshID());
+		glDeleteVertexArrays(ground.getMeshID());
 		// Free the window callbacks and destroy the window
 		glfwFreeCallbacks(window);
 		glfwDestroyWindow(window);
@@ -614,8 +446,6 @@ public void DrawStuff() {
 		glfwSetErrorCallback(null).free();
 }
 
-	public static void main(String[] args) throws Exception {
-		new Main().run();
-	}
+
 
 }
