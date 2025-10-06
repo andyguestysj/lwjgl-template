@@ -93,6 +93,7 @@ public class Main {
 	public int programID;
 	public Map<String, Integer> uniforms;
 
+	public ArrayList<Mesh> meshObjects;
 	public Mesh cube;
 	public Mesh ground;
 
@@ -109,6 +110,12 @@ public class Main {
 	public boolean KEY_RIGHT_DOWN = false;
 	public boolean KEY_UP_DOWN = false;
 	public boolean KEY_DOWN_DOWN = false;
+	public boolean KEY_I_DOWN = false;
+	public boolean KEY_K_DOWN = false;
+	public boolean KEY_J_DOWN = false;
+	public boolean KEY_L_DOWN = false;
+
+
 
 
 	private static final float FOV = (float) Math.toRadians(60.0f);
@@ -144,8 +151,25 @@ public class Main {
 		createUniform("projectionMatrix");
 		createUniform("worldMatrix");
 
-		cube = makeCube();
-		ground = makeGround();
+		meshObjects = new ArrayList<Mesh>();
+		meshObjects.add(makeCube());
+		meshObjects.add(makeCube2());
+
+		float[] col1 = {0.25f,0f,0f};
+		float[] col2 = {0f,0.25f,0f};
+
+		int count=0;
+		for (int x=0; x<11; x++){
+			for (int z=0; z<11; z++){
+				if (count%2==0)
+					meshObjects.add(makeSquare(x-5f, z-5f, 1.0f, col1));
+				else
+					meshObjects.add(makeSquare(x-5f, z-5f, 1.0f, col2));
+				count++;
+			}
+		}
+
+		//meshObjects.add(makeGround());
 	
 		loop();
 		cleanup();
@@ -230,8 +254,6 @@ public class Main {
 	public void Render() {
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
- 		//glViewport(0, 0, WIDTH,HEIGHT);
-		
 
 		glUseProgram(programID);
 		if (glGetProgrami(programID, GL_LINK_STATUS) == 0) {			
@@ -240,16 +262,17 @@ public class Main {
 		setUniform("projectionMatrix", projectionMatrix);
 
 		Matrix4f localWorldMatrix = getWorldMatrix();
-		setUniform("worldMatrix", localWorldMatrix);
 
 
-		glBindVertexArray(cube.getMeshID());
-    glDrawElements(GL_TRIANGLES, cube.getVertexCount(), GL_UNSIGNED_INT, 0);
-
-		glBindVertexArray(ground.getMeshID());		
-    glDrawElements(GL_TRIANGLES, ground.getVertexCount(), GL_UNSIGNED_INT, 0);
-
-		
+		for (Mesh aMesh : meshObjects){
+			Vector3f aPos = aMesh.getPos();
+			localWorldMatrix = getWorldMatrix();
+			localWorldMatrix.translate(aPos);
+			setUniform("worldMatrix", localWorldMatrix);			
+			glBindVertexArray(aMesh.getMeshID());
+			
+    		glDrawElements(GL_TRIANGLES, aMesh.getVertexCount(), GL_UNSIGNED_INT, 0);	
+		}
 		glBindVertexArray(0);
 		glUseProgram(0);
 
@@ -258,10 +281,10 @@ public class Main {
 
 	public Matrix4f getWorldMatrix() {
 		worldMatrix.identity().translate(offset).
-						rotateX((float)Math.toRadians(rotation.x)).
-						rotateY((float)Math.toRadians(rotation.y)).
-						rotateZ((float)Math.toRadians(rotation.z)).
-						scale(scale);
+			rotateX((float)Math.toRadians(rotation.x)).
+			rotateY((float)Math.toRadians(rotation.y)).
+			rotateZ((float)Math.toRadians(rotation.z)).
+			scale(scale);
 		return worldMatrix;
 	}
 
@@ -287,21 +310,21 @@ public class Main {
 
 		float[] positions = new float[]{
 			// VO
-			-0.5f,  0.5f,  0.5f,
+			-0.5f,  1f,  0.5f,
 			// V1
-			-0.5f, -0.5f,  0.5f,
+			-0.5f, 0f,  0.5f,
 			// V2
-			0.5f, -0.5f,  0.5f,
+			0.5f, 0f,  0.5f,
 			// V3
-			0.5f,  0.5f,  0.5f,
+			0.5f,  1f,  0.5f,
 			// V4
-			-0.5f,  0.5f, -0.5f,
+			-0.5f,  1f, -0.5f,
 			// V5
-			0.5f,  0.5f, -0.5f,
+			0.5f,  1f, -0.5f,
 			// V6
-			-0.5f, -0.5f, -0.5f,
+			-0.5f, 0f, -0.5f,
 			// V7
-			0.5f, -0.5f, -0.5f,
+			0.5f, 0f, -0.5f,
 };
 
 		float[] colors = new float[]{
@@ -329,18 +352,68 @@ public class Main {
 		 7, 6, 4, 7, 4, 5,
 		};
 
-		return new Mesh(positions, colors, indices);
+		return new Mesh("Cube", positions, colors, indices);
 
 	}
 
+	public Mesh makeCube2(){
+
+		float[] positions = new float[]{
+			// VO
+			2f,  0.25f,  0.25f,
+			// V1
+			2f, 0f,  0.25f,
+			// V2
+			2.25f, 0f,  0.25f,
+			// V3
+			2.25f,  0.25f,  0.25f,
+			// V4
+			2f,  0.25f, 0f,
+			// V5
+			2.25f,  0.25f, 0f,
+			// V6
+			2f, 0f, 0f,
+			// V7
+			2.25f, 0f, 0f,
+};
+
+		float[] colors = new float[]{
+			0.5f, 0.0f, 0.0f,
+			0.0f, 0.5f, 0.0f,
+			0.0f, 0.0f, 0.5f,
+			0.0f, 0.5f, 0.5f,
+			0.5f, 0.0f, 0.0f,
+			0.0f, 0.5f, 0.0f,
+			0.0f, 0.0f, 0.5f,
+			0.0f, 0.5f, 0.5f,
+		};
+		int[] indices = new int[]{
+		 // Front face
+		 0, 1, 3, 3, 1, 2,
+		 // Top Face
+		 4, 0, 3, 5, 4, 3,
+		 // Right face
+		 3, 2, 7, 5, 3, 7,
+		 // Left face
+		 6, 1, 0, 6, 0, 4,
+		 // Bottom face
+		 2, 1, 6, 2, 6, 7,
+		 // Back face
+		 7, 6, 4, 7, 4, 5,
+		};
+
+		return new Mesh("Cube2", positions, colors, indices);
+
+	}
+	
 	private Mesh makeGround(){
 		
 		float[] positions = new float[]{
-			-100f, -1f, -100f,
-			-100f, -1f, 100f,
-			100f, -1f, 100f,
-			100f, -1f, -100f
-};
+			-100f, 0f, -100f,
+			-100f, 0f, 100f,
+			100f, 0f, 100f,
+			100f, 0f, -100f
+		};
 
 		float[] colors = new float[]{
 				0.25f, 0.25f, 0.25f,
@@ -352,17 +425,33 @@ public class Main {
 		int[] indices = new int[]{
 			0, 1, 2, // first triangle
 			0, 2, 3  // second triangle
-	};
+		};
 
-	return new Mesh(positions, colors, indices);
+	return new Mesh("Ground", positions, colors, indices);
 	}
 
+	private Mesh makeSquare(float x, float z, float size, float[] col){
+		float[] positions = new float[]{
+			x, 0f, z,
+			x+size, 0f, z,
+			x+size, 0f, z+size,
+			x, 0f, z+size
+		};
 
-	
+		float[] colors = new float[]{
+				col[0], col[1], col[2],
+				col[0], col[1], col[2],
+				col[0], col[1], col[2],
+				col[0], col[1], col[2]
+		};
 
+		int[] indices = new int[]{
+			0, 1, 2, // first triangle
+			0, 2, 3  // second triangle
+		};
 
-
-
+		return new Mesh("Square", positions, colors, indices);
+	}
 
 	public void keyCallBack(int key, int action) {
 
@@ -393,7 +482,19 @@ public class Main {
 
 		if (key == GLFW_KEY_DOWN && action == GLFW_PRESS) KEY_DOWN_DOWN = true;
 		else if (key == GLFW_KEY_DOWN && action == GLFW_RELEASE) KEY_DOWN_DOWN = false;
-}
+
+		if (key == GLFW_KEY_I && action == GLFW_PRESS) KEY_I_DOWN = true;
+		else if (key == GLFW_KEY_I && action == GLFW_RELEASE) KEY_I_DOWN = false;
+
+		if (key == GLFW_KEY_K && action == GLFW_PRESS) KEY_K_DOWN = true;
+		else if (key == GLFW_KEY_K && action == GLFW_RELEASE) KEY_K_DOWN = false;
+
+		if (key == GLFW_KEY_J && action == GLFW_PRESS) KEY_J_DOWN = true;
+		else if (key == GLFW_KEY_J && action == GLFW_RELEASE) KEY_J_DOWN = false;
+
+		if (key == GLFW_KEY_L && action == GLFW_PRESS) KEY_L_DOWN = true;
+		else if (key == GLFW_KEY_L && action == GLFW_RELEASE) KEY_L_DOWN = false;
+	}
 
 	private void do_key_stuff(){
 
@@ -427,6 +528,20 @@ public class Main {
 		if (KEY_UP_DOWN){
 			offset.z += 0.01f;
 		}
+
+		if (KEY_I_DOWN){			
+			meshObjects.getFirst().setPosZ(-0.01f);
+		}
+		if (KEY_K_DOWN){			
+			meshObjects.getFirst().setPosZ(0.01f);
+		}
+
+		if (KEY_J_DOWN){			
+			meshObjects.getFirst().setPosX(-0.01f);
+		}
+		if (KEY_L_DOWN){			
+			meshObjects.getFirst().setPosX(0.01f);
+		}
 		
 	}
 	
@@ -434,8 +549,11 @@ public class Main {
 
 	public void cleanup() {
 		//vboIdList.forEach(GL30::glDeleteBuffers);
-		glDeleteVertexArrays(cube.getMeshID());
-		glDeleteVertexArrays(ground.getMeshID());
+		for (Mesh aMesh : meshObjects){
+			glDeleteVertexArrays(aMesh.getMeshID());
+		}
+		
+		
 		// Free the window callbacks and destroy the window
 		glfwFreeCallbacks(window);
 		glfwDestroyWindow(window);

@@ -16,6 +16,7 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import org.joml.Vector3f;
 
 import org.lwjgl.system.MemoryStack;
 import java.util.*;
@@ -30,10 +31,16 @@ public class Mesh {
   public int vertCount;
   public int vaoId;	
 
+  public Vector3f pos;
+
   
 
-  public Mesh(float[] positions, float[] colours, int[] indices) {
+  public Mesh(String name, float[] positions, float[] colours, int[] indices) {
     vertCount = indices.length;
+	this.name = name;
+
+	pos = new Vector3f(0f,0f,0f);
+
     
     List<Integer> vboIdList;
 
@@ -119,7 +126,18 @@ public class Mesh {
   }
 	
 	public int getMeshID() { return vaoId;}
-  public int getVertexCount() { return vertCount;}
+	public int getVertexCount() { return vertCount;}
+
+	public void setPos(Vector3f vect){
+		
+		pos.set(vect);
+	}
+	public Vector3f getPos(){ return pos;}
+
+	public float getPosX(){ return pos.x;}
+	public void setPosX(float deltaX) {pos.add(deltaX,0.0f,0.0f);}
+	public float getPosZ(){ return pos.z;}
+	public void setPosZ(float deltaZ) {pos.add(0.0f,0.0f,deltaZ);}
 
 	
 
