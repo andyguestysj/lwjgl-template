@@ -35,12 +35,63 @@ public class Mesh {
 
   
 
+  public Mesh(String name, float[] positions, float[] colours, int[] indices, Vector3f translate) {
+    vertCount = indices.length;
+	this.name = name;
+
+	pos = translate;
+
+    
+    List<Integer> vboIdList;
+
+		try (MemoryStack stack = MemoryStack.stackPush()) {
+
+			vboIdList = new ArrayList<>();
+
+			vaoId = glGenVertexArrays();
+			glBindVertexArray(vaoId);
+
+			int vboId = glGenBuffers();
+			
+			vboIdList.add(vboId);
+			FloatBuffer positionsBuffer = stack.callocFloat(positions.length);
+			positionsBuffer.put(0,positions);
+			glBindBuffer(GL_ARRAY_BUFFER, vboId);
+			glBufferData(GL_ARRAY_BUFFER, positionsBuffer, GL_STATIC_DRAW);
+			glEnableVertexAttribArray(0);
+			glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
+			
+
+            // Color VBO
+			vboId = glGenBuffers();
+			vboIdList.add(vboId);
+			FloatBuffer colorsBuffer = stack.callocFloat(colours.length);
+			colorsBuffer.put(0, colours);
+			glBindBuffer(GL_ARRAY_BUFFER, vboId);
+			glBufferData(GL_ARRAY_BUFFER, colorsBuffer, GL_STATIC_DRAW);
+			glEnableVertexAttribArray(1);
+			glVertexAttribPointer(1, 3, GL_FLOAT, false, 0, 0);
+
+			// Index VBO
+			vboId = glGenBuffers();
+			vboIdList.add(vboId);
+			IntBuffer indicesBuffer = stack.callocInt(indices.length);
+			indicesBuffer.put(0, indices);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vboId);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesBuffer, GL_STATIC_DRAW);
+
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			glBindVertexArray(0);
+    }
+  
+  }
+
   public Mesh(String name, float[] positions, float[] colours, int[] indices) {
     vertCount = indices.length;
 	this.name = name;
 
+	
 	pos = new Vector3f(0f,0f,0f);
-
     
     List<Integer> vboIdList;
 
